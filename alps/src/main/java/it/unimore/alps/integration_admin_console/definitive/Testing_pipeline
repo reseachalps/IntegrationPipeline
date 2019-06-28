@@ -1,0 +1,238 @@
+@Library('re-search-alps-library')_
+pipeline {
+    agent any
+    parameters{
+        string(name: 'project_jar', defaultValue: '/var/jenkins_home/workspace/empty.jar', description: 'Jar of the project')
+        string(name: 'data_path', defaultValue: '/var/', description: 'Data directory')
+        string(name: 'db', defaultValue: 'alpsv13', description: 'DB name')
+        string(name: 'path_csv_export', defaultValue: '/var/', description: 'Directory for deduplication')
+        string(name: 'log_dir', defaultValue: '/var/', description: 'Log directory')
+        string(name: 'dedup_db', defaultValue: 'alpsv13Dedup', description: 'Dedup DB name')
+        choice(name: 'source', choices: ['All', '0 ORCID', '1 SCANR', '2 ARIANNA', '3 BVD', '4 CERCAUNIVERSITA', '5 CNR', '6 PATIRIS', '7 QUESTIO', '8 REGISTRO IMPRESE', '9 P3', '10 GRID', '11 FWF', '12 SICRIS', '13 ARAMIS', '14 FOEN', '15 OPENAIRE', '16 GENERIC IMPORTER'], description: 'Data sources')
+        choice(name: 'phase', choices: ['data importing', 'data integration', 'exporting data for deduplication', 'deduplication', 'post-deduplication integration', 'data exporting'], description: 'Select whitch stage to execute')
+    }
+    environment{
+        sourceNum = 17
+        lastState = state()
+    }
+    stages {
+        stage('data importing'){
+        	when{
+             	equals expected: "data importing", actual: "${phase}"
+       		}
+            steps{
+                script {
+                    if ("${source}" == "All"){
+                        for (int i = 0; i < "${sourceNum}".toInteger(); i++) {
+                            echo "Executiong importation ${i+1} of ${sourceNum}..."
+                            importer("${project_jar}", "${data_path}", "${db}", "${log_dir}", "${i}")
+                        }
+                    } else {
+                        echo "Executiong importation on ${source}..."
+                        importer("${project_jar}", "${data_path}", "${db}", "${log_dir}", "${source}".substring(0,"${source}".indexOf(' ')))
+                        }
+                }
+            }
+            post {
+                success {
+                    echo "data importing completed successfully"
+                    sh "echo 'import successful' > log.txt"
+                    script{
+                        reply = input(message: "Continue to the next stage", ok: "Ok", parameters: [choice(name: 'reply', choices: ['yes', 'no'])])
+                        if("${reply}" == "yes"){
+                            phase = 'data integration'
+                        	lastState = state()    
+                        }
+                    }
+                }
+                failure{
+                    echo "data importing failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('data integration'){
+        	when{
+             	equals expected: "data integration", actual: "${phase}"
+       		}
+            steps{
+                script{
+                	if("${lastState}" == "import successful"){
+                        echo "Starting integration..."
+                    	integration("${project_jar}", "${db}", "${log_dir}")
+                    } else {
+                        error 'not after import'
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "data integration completed successfully"
+                    sh "echo 'integration successful' > log.txt"
+                    script{
+                        reply = input(message: "Continue to the next stage", ok: "Ok", parameters: [choice(name: 'reply', choices: ['yes', 'no'])])
+                        if("${reply}" == "yes"){
+                            phase = 'exporting data for deduplication'
+                        	lastState = state()    
+                        }
+                    }
+                }
+                failure{
+                    echo "data integration failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('exporting data for deduplication'){
+        	when{
+             	equals expected: "exporting data for deduplication", actual: "${phase}"
+       		}
+            steps{
+                script{
+                	switch("${lastState}"){
+                		case "integration successful":
+                        	echo "Starting exporting data for deduplication..."
+                        	break
+                        case "import successful":
+                        	input(message: "Warning, continue after import?", ok: "Ok")
+                            echo "Continue anyway"
+                            break
+                        default:
+                        	error 'not after integration'
+                        	break
+                    }
+                    csv_export("${project_jar}", "${db}", "${log_dir}", "${path_csv_export}")
+                }
+            }
+            post {
+                success {
+                    echo "exporting data for deduplication completed successfully"
+                    sh "echo 'csv_export successful' > log.txt"
+                    script{
+                        reply = input(message: "Continue to the next stage", ok: "Ok", parameters: [choice(name: 'reply', choices: ['yes', 'no'])])
+                        if("${reply}" == "yes"){
+                            phase = 'deduplication'
+                        	lastState = state()    
+                        }
+                    }
+                }
+                failure{
+                    echo "exporting data for deduplication failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('deduplication'){
+        	when{
+             	equals expected: "deduplication", actual: "${phase}"
+       		}
+            steps{
+                script{
+                	if("${lastState}" == "csv_export successful"){
+                        echo "Starting deduplication..."
+                    	deduplication("${db}", "${log_dir}", "${path_csv_export}")
+                    } else {
+                        error 'not after csv export'
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "deduplication completed successfully"
+                    sh "echo 'deduplication successful' > log.txt"
+                    script{
+                        reply = input(message: "Continue to the next stage", ok: "Ok", parameters: [choice(name: 'reply', choices: ['yes', 'no'])])
+                        if("${reply}" == "yes"){
+                            phase = 'post-deduplication integration'
+                        	lastState = state()    
+                        }
+                    }
+                }
+                failure{
+                    echo "deduplication failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('post-deduplication integration'){
+        	when{
+             	equals expected: "post-deduplication integration", actual: "${phase}"
+       		}
+            steps{
+                script{
+                	if("${lastState}" == "deduplication successful"){
+                        echo "Stariting integrazione post deduplicazione..."
+                    	nuts_integration("${project_jar}", "${db}", "${log_dir}", "${dedup_db}")
+                    } else {
+                        error 'not after deduplication'
+                    }
+                }
+                
+            }
+            post {
+                success {
+                    echo "post-deduplication integration completed successfully"
+                    sh "echo 'nuts_integration successful' > log.txt"
+                    script{
+                        reply = input(message: "Continue to the next stage", ok: "Ok", parameters: [choice(name: 'reply', choices: ['yes', 'no'])])
+                        if("${reply}" == "yes"){
+                            phase = 'data exporting'
+                        	lastState = state()    
+                        }
+                    }
+                }
+                failure{
+                    echo "post-deduplication integration failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('data exporting'){
+        	when{
+             	equals expected: "data exporting", actual: "${phase}"
+       		}
+            steps{
+                script{
+                	switch("${lastState}"){
+                		case "nuts_integration successful":
+                        	echo "Starting final exportation..."
+                        	break
+                        case "deduplication successful":
+                        	input(message: "Warning, continue after deduplication?", ok: "Ok")
+                            echo "Continue anyway"
+                            break
+                        default:
+                        	error 'not after nuts integration'
+                        	break
+                    }
+                    json_export("${project_jar}", "${db}", "${log_dir}", "${dedup_db}")
+                }
+            }
+            post {
+                success {
+                    echo "data exporting completed successfully"
+                    sh "echo 'json_export successful' > log.txt"
+                    script{
+                        email.success()
+                    }
+                }
+                failure{
+                    echo "data exporting failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+    }
+}

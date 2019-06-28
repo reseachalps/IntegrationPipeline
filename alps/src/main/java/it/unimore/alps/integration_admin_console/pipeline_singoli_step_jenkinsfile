@@ -1,0 +1,209 @@
+@Library('re-search-alps-library')_
+pipeline {
+    agent any
+    parameters{
+        string(name: 'project_jar', defaultValue: '/var/jenkins_home/workspace/empty.jar', description: 'File java da usare nel progetto')
+        string(name: 'data_path', defaultValue: '/var/', description: 'Path utilizzato in fase di importazione')
+        string(name: 'db', defaultValue: 'alpsv13', description: 'Nome da utilizzare nella creazione del database')
+        string(name: 'path_csv_export', defaultValue: '/var/', description: 'Nome assoluto usato nell\' esportazione per la deduplicazione')
+        string(name: 'log_dir', defaultValue: '/var/', description: 'Nome assoluto dove vengono conservati i log delle esecuzioni')
+        string(name: 'dedup_db', defaultValue: 'alpsv13Dedup', description: 'Nome database deduplicazione')
+        choice(name: 'source', choices: ['0 ORCID', '1 SCANR', '2 ARIANNA', '3 BVD', '4 CERCAUNIVERSITA', '5 CNR', '6 PATIRIS', '7 QUESTIO', '8 REGISTRO IMPRESE', '9 P3', '10 GRID', '11 FWF', '12 SICRIS', '13 ARAMIS', '14 FOEN', '15 OPENAIRE', '16 GENERIC IMPORTER', 'Esegui tutti'], description: 'Scegli fonte da utilizzare')
+        choice(name: 'fase', choices: ['Importazione', 'Integrazione', 'Esportazione per deduplicazione', 'Deduplicazione', 'Integrazione post deduplicazione', 'Esportazione finale'], description: 'Scegli la fase da cui partire')
+    }
+    environment{
+        lastState = readFile('../log.txt').trim()
+    }
+    stages {
+        stage('Importazione'){
+            when{
+                equals expected: "Importazione", actual: "${fase}"
+            }
+            steps{
+                script {
+                    if ("${source}" == "Esegui tutti"){
+                        for (int i = 0; i < 17; i++) {
+                            echo "Eseguendo importazione ${i}"
+                            importer("${project_jar}", "${data_path}", "${db}", "${log_dir}", "${i}")
+                        }
+                    } else {
+                        echo "Inizio fase di importazione per ${source}"
+                        importer("${project_jar}", "${data_path}", "${db}", "${log_dir}", "${source[0]}${source[1]}")
+                        }
+                }
+            }
+            post {
+                success {
+                    echo "Fase importazione completata con successo"
+                    sh "echo 'import successful' > ../log.txt"
+                    script{
+                        prosegui = input(message: "Vuoi eseguire la fase di integrazione", ok: "Conferma", parameters: [choice(name: 'prosegui', choices: ['si', 'no'], description: 'Eseguire integrazione')])
+                        if("${prosegui}" == "si")
+                            fase = 'Integrazione'
+                    }
+                }
+                failure{
+                    echo "Fase importazione fallita"
+                    sh "echo 'import failed' > ../log.txt"
+                }
+            }
+        }
+        stage('Integrazione'){
+            when{
+                equals expected: "Integrazione", actual: "${fase}"
+            }
+            steps{
+                script{
+                    lastState = readFile('../log.txt').trim()
+                    if("${lastState}" == "import successful"){
+                        echo "Inizio fase di integrazione"
+                        integration("${project_jar}", "${db}", "${log_dir}")
+                    } else {
+                        error 'not after import'
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "Fase integrazione completata con successo"
+                    sh "echo 'integration successful' > ../log.txt"
+                    script{
+                        prosegui = input(message: "Vuoi eseguire la fase di esportazione per deduplicazione?", ok: "Conferma", parameters: [choice(name: 'prosegui', choices: ['si', 'no'], description: 'Eseguire esportazione per deduplicazione')])
+                        if("${prosegui}" == "si")
+                            fase = 'Esportazione per deduplicazione'
+                    }
+                }
+                failure{
+                    echo "Fase integrazione fallita"
+                }
+            }
+        }
+        stage('Esportazione per deduplicazione'){
+            when{
+                equals expected: "Esportazione per deduplicazione", actual: "${fase}"
+            }
+            steps{
+                script{
+                    lastState = readFile('../log.txt').trim()
+                    if("${lastState}" == "integration successful"){
+                        echo "Inizio fase di esportazione per deduplicazione"
+                    } else {
+                        if("${lastState}" == "import successful"){
+                            input(message: "Attenzione, eseguire la fase di esportazione per deduplicazione dopo importazione?", ok: "Va bene")
+                            echo "Eseguiamo comunque"
+                        } else {
+                            error 'not after integration'
+                        }
+                    }
+                    csv_export("${project_jar}", "${db}", "${log_dir}", "${path_csv_export}")
+                }
+            }
+            post {
+                success {
+                    echo "Fase esportazione_csv completata con successo"
+                    sh "echo 'csv_export successful' > ../log.txt"
+                    script{
+                        prosegui = input(message: "Vuoi eseguire la fase di deduplicazione?", ok: "Conferma", parameters: [choice(name: 'prosegui', choices: ['si', 'no'], description: 'Eseguire deduplicazione')])
+                        if("${prosegui}" == "si")
+                            fase = 'Deduplicazione'
+                    }
+                }
+                failure{
+                    echo "Fase esportazione_csv fallita"
+                }
+            }
+        }
+        stage('Deduplicazione'){
+            when{
+                equals expected: "Deduplicazione", actual: "${fase}"
+            }
+            steps{
+                script{
+                    lastState = readFile('../log.txt').trim()
+                    if("${lastState}" == "csv_export successful"){
+                        echo "Inizio fase di deduplicazione"
+                        deduplication("${db}", "${log_dir}", "${path_csv_export}")
+                    } else {
+                        error 'not after csv esportation'
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "Fase deduplicazione completata con successo"
+                    sh "echo 'deduplication successful' > ../log.txt"
+                    script{
+                        prosegui = input(message: "Vuoi eseguire la fase di integrazione dopo deduplicazione?", ok: "Conferma", parameters: [choice(name: 'prosegui', choices: ['si', 'no'], description: 'Eseguire integrazione post deduplicazione')])
+                        if("${prosegui}" == "si")
+                            fase = 'Integrazione post deduplicazione'
+                    }
+                }
+                failure{
+                    echo "Fase deduplicazione fallita"
+                }
+            }
+        }
+        stage('Integrazione post deduplicazione'){
+            when{
+                equals expected: "Integrazione post deduplicazione", actual: "${fase}"
+            }
+            steps{
+                script{
+                    lastState = readFile('../log.txt').trim()
+                    if("${lastState}" == "deduplication successful"){
+                        echo "Inizio fase di integrazione post deduplicazione"
+                        nuts_integration("${project_jar}", "${db}", "${log_dir}", "${dedup_db}")
+                        } else {
+                            error 'not after deduplication'
+                            
+                        }
+                }
+                
+            }
+            post {
+                success {
+                    echo "Fase integrazione_post_deduplicazione completata con successo"
+                    sh "echo 'nuts_integration successful' > ../log.txt"
+                    script{
+                        prosegui = input(message: "Vuoi eseguire la fase di esportazione finale?", ok: "Conferma", parameters: [choice(name: 'prosegui', choices: ['si', 'no'], description: 'Eseguire esportazione finale')])
+                        if("${prosegui}" == "si")
+                            fase = 'Esportazione finale'
+                    }
+                }
+                failure{
+                    echo "Fase integrazione post deduplicazione fallita"
+                }
+            }
+        }
+        stage('Esportazione finale'){
+            when{
+                equals expected: "Esportazione finale", actual: "${fase}"
+            }
+            steps{
+                script{
+                    lastState = readFile('../log.txt').trim()
+                    if("${lastState}" == "nuts_integration successful"){
+                        echo "Inizio fase di esportazione finale"
+                    } else {
+                        if("${lastState}" == "deduplication successful"){
+                            input(message: "Attenzione, sicuro di volere eseguire l'esportazione finale dopo la deduplicazione?", ok: "Va bene")
+                            echo "Eseguiamo comunque"
+                        } else {
+                            error 'not after nuts integration'
+                        }
+                    }
+                    json_export("${project_jar}", "${db}", "${log_dir}", "${dedup_db}")
+                }
+            }
+            post {
+                success {
+                    echo "Fase di esportazione finale completata con successo"
+                    sh "echo 'json export successful' > ../log.txt"
+                }
+                failure{
+                    echo "Fase esportazione finale fallita"
+                }
+            }
+        }
+    }
+}

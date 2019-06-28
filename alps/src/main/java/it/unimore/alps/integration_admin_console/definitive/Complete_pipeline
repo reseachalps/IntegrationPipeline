@@ -1,0 +1,143 @@
+@Library('re-search-alps-library')_
+pipeline {
+    agent any
+    parameters{
+        string(name: 'project_jar', defaultValue: '/var/jenkins_home/workspace/empty.jar', description: 'Jar of the project')
+        string(name: 'data_path', defaultValue: '/var/', description: 'Data directory')
+        string(name: 'db', defaultValue: 'alpsv13', description: 'DB name')
+        string(name: 'path_csv_export', defaultValue: '/var/', description: 'Directory for deduplication')
+        string(name: 'log_dir', defaultValue: '/var/', description: 'Log directory')
+        string(name: 'dedup_db', defaultValue: 'alpsv13Dedup', description: 'Dedup DB name')
+        choice(name: 'source', choices: ['All', '0 ORCID', '1 SCANR', '2 ARIANNA', '3 BVD', '4 CERCAUNIVERSITA', '5 CNR', '6 PATIRIS', '7 QUESTIO', '8 REGISTRO IMPRESE', '9 P3', '10 GRID', '11 FWF', '12 SICRIS', '13 ARAMIS', '14 FOEN', '15 OPENAIRE', '16 GENERIC IMPORTER'], description: 'Data sources')
+    }
+    environment{
+        sourceNum = 17
+    }
+    stages {
+        stage('data importing'){
+            steps{
+                script {
+                    if ("${source}" == "All"){
+                        for (int i = 0; i < "${sourceNum}".toInteger(); i++) {
+                            echo "Executiong importation ${i+1} of ${sourceNum}..."
+                            importer("${project_jar}", "${data_path}", "${db}", "${log_dir}", "${i}")
+                        }
+                    } else {
+                        echo "Executiong importation on ${source}..."
+                        importer("${project_jar}", "${data_path}", "${db}", "${log_dir}", "${source}".substring(0,"${source}".indexOf(' ')))
+                        }
+                }
+            }
+            post {
+                success {
+                    echo "data importing completed successfully"
+                }
+                failure{
+                    echo "data importing failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('data integration'){
+            steps{
+                script{
+                	echo "Starting integration..."
+                    integration("${project_jar}", "${db}", "${log_dir}")
+                }
+            }
+            post {
+                success {
+                    echo "data integration completed successfully"
+                }
+                failure{
+                    echo "data integration failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('exporting data for deduplication'){
+            steps{
+                script{
+                	echo "Starting exporting data for deduplication..."
+                    csv_export("${project_jar}", "${db}", "${log_dir}", "${path_csv_export}")
+                }
+            }
+            post {
+                success {
+                    echo "exporting data for deduplication completed successfully"
+                }
+                failure{
+                    echo "exporting data for deduplication failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('deduplication'){
+            steps{
+                script{
+                	echo "Starting deduplication..."
+                    deduplication("${db}", "${log_dir}", "${path_csv_export}")
+                }
+            }
+            post {
+                success {
+                    echo "deduplication completed successfully"
+                }
+                failure{
+                    echo "deduplication failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('post-deduplication integration'){
+            steps{
+                script{
+                	echo "Stariting integrazione post deduplicazione..."
+                    nuts_integration("${project_jar}", "${db}", "${log_dir}", "${dedup_db}")
+                }
+                
+            }
+            post {
+                success {
+                    echo "post-deduplication integration completed successfully"
+                }
+                failure{
+                    echo "post-deduplication integration failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+        stage('data exporting'){
+            steps{
+                script{
+                    echo "Starting final exportation..."
+                    json_export("${project_jar}", "${db}", "${log_dir}", "${dedup_db}")
+                }
+            }
+            post {
+                success {
+                    echo "data exporting completed successfully"
+                    script{
+                        email.success()
+                    }
+                }
+                failure{
+                    echo "data exporting failed"
+                    script{
+                        email.error("${phase}")
+                    }
+                }
+            }
+        }
+    }
+}

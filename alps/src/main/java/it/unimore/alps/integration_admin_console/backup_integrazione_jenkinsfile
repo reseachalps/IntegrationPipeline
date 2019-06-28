@@ -1,0 +1,42 @@
+@Library('re-search-alps-library')_
+pipeline {
+    agent any
+    parameters{
+        string(name: 'project_jar', defaultValue: '/home/matteop/script/alps-0.0.1-SNAPSHOT.jar', description: 'File java da usare nel progetto')
+        string(name: 'db', defaultValue: 'alpsv13', description: 'Nome da utilizzare nella creazione del database')
+        string(name: 'path_csv_export', defaultValue: '/home/matteop/script/csv_data_23_10_2018/', description: 'Nome assoluto usato nell\' esportazione per la deduplicazione')
+        string(name: 'log_dir', defaultValue: '/home/matteop/log/', description: 'Nome assoluto dove vengono conservati i log delle esecuzioni')
+        string(name: 'dedup_db', defaultValue: 'alpsv13Dedup', description: 'Nome database deduplicazione')
+    }
+    environment{
+        lastState = readFile('../log.txt').trim()
+    }
+    stages {
+        stage('Integrazione'){
+            steps{
+                script{
+                    if("${lastState}" == "import successful"){
+                        echo "Inizio fase di integrazione"
+                        integration("${project_jar}", "${db}", "${log_dir}")
+                    } else {
+                        error 'not after import'
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "Fase integrazione completata con successo"
+                    sh "echo 'integration successful' > ../log.txt"
+                    script{
+                        prosegui = input(message: "Vuoi eseguire la fase di esportazione per deduplicazione?", ok: "Conferma", parameters: [choice(name: 'prosegui', choices: ['si', 'no'], description: 'Eseguire esportazione csv')])
+                        if("${prosegui}" == "si")
+                            build job: 'Re-search_Alps_EsportazioneCSV', parameters: [[$class: 'StringParameterValue', name: 'project_jar', value: project_jar], [$class: 'StringParameterValue', name: 'db', value: db], [$class: 'StringParameterValue', name: 'path_csv_export', value: path_csv_export], [$class: 'StringParameterValue', name: 'log_dir', value: log_dir], [$class: 'StringParameterValue', name: 'dedup_db', value: dedup_db]]
+                    }
+                }
+                failure{
+                    echo "Fase integrazione fallita"
+                }
+            }
+        }
+    }
+}
