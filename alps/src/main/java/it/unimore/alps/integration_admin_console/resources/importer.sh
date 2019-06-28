@@ -1,6 +1,4 @@
 #!/bin/bash
-# invocation example
-# bash data_import.sh /home/matteop/script/alps-0.0.1-SNAPSHOT.jar /home/matteop/new_data/ alpsv13 /home/matteop/log/ 12
 
 # input parameters
 project_jar=$1;
@@ -49,11 +47,11 @@ case $db in
 		 exit 2;;
 esac
 
-#check that N is positive number less than 17
+#check that N is positive number less than 18
 case $N in
 	*[!0-9]*) echo "$N not a number"
 		 exit 2;;
-	*) if test $N -lt 0 -o $N -ge 17
+	*) if test $N -lt 0 -o $N -ge 18
 	   then
 		echo "$N out of bounds"
 		 exit 2
@@ -79,7 +77,8 @@ executor7="java -Xmx10g -cp ${project_jar} it.unimore.alps.sources.patiris.Patir
 #QUESTIO
 executor8="java -Xmx10g -cp ${project_jar} it.unimore.alps.sources.questio.QuestioImporter -DB $db -data ${data_path}questio/QuestioCrawledData.csv &> ${log_dir}log_questio_${db}.log";
 #REGISTRO IMPRESE
-executor9="java -Xmx10g -cp ${project_jar} it.unimore.alps.sources.registroimprese.RegistroImpreseImporter -DB $db -pmiFile ${data_path}registroimprese/pmi.csv -startupFile ${data_path}registroimprese/startup02072018.csv -incubatorFile ${data_path}registroimprese/incubatori.csv &> ${log_dir}log_registro_${db}.log";
+#executor9="java -Xmx10g -cp ${project_jar} it.unimore.alps.sources.registroimprese.RegistroImpreseImporter -DB $db -smeFile ${data_path}registroimprese/pmi.csv -startupFile ${data_path}registroimprese/startup02072018.csv -incubatorFile ${data_path}registroimprese/incubatori.csv &> ${log_dir}log_registro_${db}.log";
+executor9="java -Xmx10g -cp ${project_jar} it.unimore.alps.sources.registroimprese.RegistroImpreseImporter -DB $db -smeFile ${data_path}registroimprese/pmi.csv -startupFile ${data_path}registroimprese/startup.csv -incubatorFile ${data_path}registroimprese/incubatori.csv &> ${log_dir}log_registro_${db}.log";
 #P3
 executor10="java -Xmx10g -cp ${project_jar} it.unimore.alps.sources.p3.P3Importer -DB $db -prjFile ${data_path}p3/P3_GrantExport_with_abstracts.csv -pplFile ${data_path}p3/P3_PersonExport.csv -pubFile ${data_path}p3/P3_PublicationExport.csv -outFile ${data_path}p3/P3_GrantOutputDataExport.csv -collabFile ${data_path}p3/P3_CollaborationExport.csv -hasAbstract -entityType all &> ${log_dir}log_p3_${db}.log";
 #GRID
@@ -96,12 +95,13 @@ executor15="java -Xmx10g -cp ${project_jar} it.unimore.alps.sources.foen.FoenImp
 executor16="java -Xmx80g -cp ${project_jar} it.unimore.alps.sources.openaire.OpenAireImporter -orgFolder /home/paolos/openaire/organizations/ -orgPrefix out_ -country IT,FR,DE,AT,LI,SI,CH -prjFolder /home/paolos/openaire/projects/ -prjPrefix projects_ -orgFileH2020 /home/paolos/cordis/cordis-h2020organizations_mod.csv -orgFileFP7 /home/paolos/cordis/cordis-fp7organizations_mod.csv -prjFileH2020 /home/paolos/cordis/cordis-h2020projects.csv -prjFileFP7 /home/paolos/cordis/cordis-fp7projects.csv -db ${db} -pubFolderOpenAire /home/paolos/openaire/publications/ &> ${log_dir}logImporterOpenaire_${db}.log";
 #GENERIC IMPORTER
 executor17="java -Xmx10g -cp ${project_jar} it.unimore.alps.genericimporter.GenericImporter -DB ${db} -data /home/matteop/new_data/generic_data/general_data.csv &> ${log_dir}log_generic_importer_${db}.log";
+#GERIT
+executor18="java -Xmx80g -cp ${project_jar} it.unimore.alps.sources.gerit.DFGImporter -orgFolder /home/paolos/gerit/jsonData/ -prjFolder /home/paolos/gerit/projectsGerit/ -orgExcelFile /home/paolos/gerit/institutionen_gerit___.xlsx -db ${db} &> ${log_dir}logImporterGerity_${db}.log";
 
 executors=("$executor1" "$executor2" "$executor3" "$executor4" "$executor5" "$executor6" "$executor7" "$executor8" "$executor9" "$executor10" "$executor11" "$executor12" "$executor13" "$executor14" "$executor15" "$executor16" "$executor17");
 
 echo "Execution of ${executors[${N}]}";
-#Per ora non lo eseguiamo
-#eval "${executors[${N}]}";
+eval "${executors[${N}]}";
 retval=$?;
 if [ $retval -ne 0 ]; then
 	echo "Error in importing phase.";

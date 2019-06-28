@@ -1,6 +1,4 @@
 #!/bin/bash
-# invocation example
-# bash data_import.sh alpsv13 /home/matteop/log/ /home/matteop/script/csv_data_23_10_2018/
 
 # input parameters
 db=$1;
@@ -47,8 +45,7 @@ deduplicators=("$deduplicator1" "$deduplicator2" "$deduplicator3");
 for i in "${deduplicators[@]}"; do
 	#"${deduplicators[i]}";
 	echo "${i[@]}";
-#Per il momento commentato
-#        eval "${i[@]}";
+	eval "${i[@]}";
 	retval=$?;
 	if [ $retval -ne 0 ]; then
 	    echo "Error in deduplication phase.";

@@ -4,15 +4,15 @@ pipeline {
     parameters{
         string(name: 'project_jar', defaultValue: '/var/jenkins_home/workspace/empty.jar', description: 'Jar of the project')
         string(name: 'data_path', defaultValue: '/var/', description: 'Data directory')
-        string(name: 'db', defaultValue: 'alpsv13', description: 'DB name')
+        string(name: 'db', defaultValue: 'alpsdb', description: 'DB name')
         string(name: 'path_csv_export', defaultValue: '/var/', description: 'Directory for deduplication')
         string(name: 'log_dir', defaultValue: '/var/', description: 'Log directory')
-        string(name: 'dedup_db', defaultValue: 'alpsv13Dedup', description: 'Dedup DB name')
-        choice(name: 'source', choices: ['All', '0 ORCID', '1 SCANR', '2 ARIANNA', '3 BVD', '4 CERCAUNIVERSITA', '5 CNR', '6 PATIRIS', '7 QUESTIO', '8 REGISTRO IMPRESE', '9 P3', '10 GRID', '11 FWF', '12 SICRIS', '13 ARAMIS', '14 FOEN', '15 OPENAIRE', '16 GENERIC IMPORTER'], description: 'Data sources')
+        string(name: 'dedup_db', defaultValue: 'alpsdb_dedup', description: 'Dedup DB name')
+        choice(name: 'source', choices: ['All', '0 ORCID', '1 SCANR', '2 ARIANNA', '3 BVD', '4 CERCAUNIVERSITA', '5 CNR', '6 PATIRIS', '7 QUESTIO', '8 REGISTRO IMPRESE', '9 P3', '10 GRID', '11 FWF', '12 SICRIS', '13 ARAMIS', '14 FOEN', '15 OPENAIRE', '16 GENERIC IMPORTER', '17 GERIT'], description: 'Data sources')
         choice(name: 'phase', choices: ['data importing', 'data integration', 'exporting data for deduplication', 'deduplication', 'post-deduplication integration', 'data exporting'], description: 'Select whitch stage to execute')
     }
     environment{
-        sourceNum = 17
+        sourceNum = 18
         lastState = state()
     }
     stages {

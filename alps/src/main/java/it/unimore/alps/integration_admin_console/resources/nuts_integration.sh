@@ -1,6 +1,4 @@
 #!/bin/bash
-# invocation example
-# bash data_import.sh /home/matteop/script/alps-0.0.1-SNAPSHOT.jar alpsv13 /home/matteop/log/ /home/matteop/script/csv_data_23_10_2018/
 
 # input parameters
 project_jar=$1;
@@ -45,6 +43,5 @@ esac
 
 # BEGIN NUTS INTEGRATOR ---------------------------------------------------------------------------
 echo "Nuts codes integration";
-#togliere echo e le virgolette, solo per testare
-echo "java -cp ${project_jar} it.unimore.alps.integrator.NutsIntegrator -DB ${dedup_db} &> ${log_dir}log_nuts_integrator_${db}.log";
+java -cp ${project_jar} it.unimore.alps.integrator.NutsIntegrator -DB ${dedup_db} &> ${log_dir}log_nuts_integrator_${db}.log;
 # END NUTS INTEGRATOR -----------------------------------------------------------------------------

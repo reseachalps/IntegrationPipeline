@@ -1,6 +1,4 @@
 #!/bin/bash
-# invocation example
-# bash data_import.sh /home/matteop/script/alps-0.0.1-SNAPSHOT.jar alpsv13 /home/matteop/log/ /home/matteop/script/csv_data_23_10_2018/
 
 # input parameters
 project_jar=$1;
@@ -51,7 +49,7 @@ esac
 # BEGIN CSV export --------------------------------------------------------------------------------
 echo "Starting exporting data in CSV..."
 #Per ora lo dichiaramo e basta, ricorda di eliminare anche le virgolette
-echo "java -Xmx20g -cp ${project_jar} it.unimore.alps.exporter.NewExporterCSV -sourceName "All" -DB ${db} -outputFolder ${path_csv_export} &> ${log_dir}log_exporterCSV_${db}.log";
+java -Xmx20g -cp ${project_jar} it.unimore.alps.exporter.NewExporterCSV -sourceName "All" -DB ${db} -outputFolder ${path_csv_export} &> ${log_dir}log_exporterCSV_${db}.log;
 retval=$?;
 if [ $retval -ne 0 ]; then
     echo "Error in exporting csv file.";

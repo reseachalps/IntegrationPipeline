@@ -1,6 +1,4 @@
 #!/bin/bash
-# invocation example
-# bash data_import.sh /home/matteop/script/alps-0.0.1-SNAPSHOT.jar alpsv13 /home/matteop/log/
 
 # input parameters
 project_jar=$1;
@@ -38,15 +36,15 @@ esac
 
 # BEGIN data integration --------------------------------------------------------------------------
 echo "Starting integration..."
-integrator1="java -Xmx10g -cp ${project_jar} it.unimore.alps.integrator.WebsiteIntegrator -DB $db -WebsiteDB websitecorrect1 &> ${log_dir}log_website_corrector_${db}.log";
-#integrator3="java -Xmx10g -cp ${project_jar} it.unimore.alps.integrator.LatLongFinale -DB $db -LatLonDB geocoordinate &> ${log_dir}log_latlon_integrator_${db}.log";
-integrator2="java -Xmx30g -cp ${project_jar} it.unimore.alps.integrator.GeoCoordinatesIntegrator -DB $db -LatLonDB geocoordinate &> ${log_dir}log_latlon_integrator_${db}.log";
-integrators=("$integrator1" "$integrator2");
+integrator1="java -Xmx10g -cp ${project_jar} it.unimore.alps.integrator.WebsiteIntegrator -DB $db -WebsiteDB cleanwebsite &> ${log_dir}log_website_corrector_${db}.log";
+integrator2="java -Xmx30g -cp ${project_jar} it.unimore.alps.integrator.GeoCoordinatesIntegrator -DB $db -LatLonDB points &> ${log_dir}log_latlon_integrator_${db}.log";
+integrator3="java -cp ${project_jar} it.unimore.alps.integrator.NutsCodesIntegrator -DB $db &> ${log_dir}log_nuts_integrator_${db}.log";
+integrators=("$integrator1" "$integrator2" "$integrator3");
+
 for j in "${integrators[@]}"; do
 	#"${integrators[j]}";
 	echo "${j[@]}";
-#per ora non lo eseguiamo
-#        eval "${j[@]}";
+	eval "${j[@]}";
 	retval=$?;
 	if [ $retval -ne 0 ]; then
 	    echo "Error in integration phase.";

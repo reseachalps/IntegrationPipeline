@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# invocation example
-# bash data_import.sh /home/matteop/script/alps-0.0.1-SNAPSHOT.jar alpsv13 /home/matteop/log/ alpsv13Dedup
-
 # input parameters
 project_jar=$1;
 db=$2;
@@ -51,8 +48,7 @@ esac
 
 # BEGIN JSON export -------------------------------------------------------------------------------
 echo "Starting exporting data in JSON..."
-#Cancella echo e le virgolette
-echo "java -Xmx80g -cp ${project_jar} it.unimore.alps.exporter.NewExporterJSON -DB ${dedup_db} &> ${log_dir}log_exporterJSON_${db}.log";
+java -Xmx80g -cp ${project_jar} it.unimore.alps.exporter.NewExporterJSON -DB ${dedup_db} &> ${log_dir}log_exporterJSON_${db}.log;
 retval=$?;
 if [ $retval -ne 0 ]; then
     echo "Error in exporting json file.";
